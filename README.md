@@ -42,3 +42,40 @@ Explanation of the command-line options:
 
 Make sure to have the required dependencies installed and access to the training dataset before executing the command.
 
+# Usage
+
+The provided script is used for image-to-image translation using the Pro-UGATIT model. It takes images from the specified input directory, performs translation using the trained model, and saves the resulting images to the specified output directory. The script can be run from the command line with various options to customize the translation process. Below is a detailed explanation of the script and its command-line arguments.
+
+## Command-Line Arguments
+
+- `--type`: The type of model to use for image translation. Currently, only "ugatit" is supported for Pro-UGATIT.
+- `--resume`: The path to the pre-trained model weights. Default is "weights/anime/train_latest.pt".
+- `--input`: The directory containing the input images for translation. Default is "test_inputs".
+- `--saved-dir`: The directory to save the translated output images. Default is "test_outputs".
+- `--dataset`: The dataset name for the model. Default is "gyate".
+- `--align`: A flag that indicates whether to perform face alignment. Currently unused in the provided script.
+- `--anime`: A flag that indicates whether the dataset is related to anime. Default is True.
+
+## Running the Script
+
+To run the image-to-image translation script, execute the following command from the terminal:
+
+```bash
+python script_name.py --type MODEL_TYPE --resume WEIGHTS_PATH --input INPUT_DIR --saved-dir OUTPUT_DIR --dataset DATASET_NAME --align --anime
+```
+
+- Replace `script_name.py` with the actual name of the Python script containing the provided code.
+- `MODEL_TYPE`: Specify the type of model to use for translation. For Pro-UGATIT, use "ugatit".
+- `WEIGHTS_PATH`: Provide the path to the pre-trained model weights.
+- `INPUT_DIR`: Set the directory containing the input images for translation.
+- `OUTPUT_DIR`: Set the directory to save the translated output images.
+- `DATASET_NAME`: Specify the dataset name for the model. Default is "gyate".
+- Use the `--align` flag to enable face alignment (currently unused).
+- Use the `--anime` flag to indicate whether the dataset is related to anime (default is True).
+
+## Note
+
+- The script processes each image in the input directory, generates translated versions using Pro-UGATIT in both directions (A to B and B to A), and saves the output images as a grid in the specified output directory.
+- The script supports multi-GPU inference. If multiple GPUs are available, specify them using the `CUDA_VISIBLE_DEVICES` environment variable before running the script.
+- The provided code contains several utility functions, including `preprocessing()` and `read_img_path()`, which are used to prepare images for input to the model. These functions handle image loading, resizing, normalization, and conversion to PyTorch tensors.
+
