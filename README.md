@@ -48,7 +48,6 @@ The provided script is used for image-to-image translation using the Pro-UGATIT 
 
 ## Command-Line Arguments
 
-- `--type`: The type of model to use for image translation. Currently, only "ugatit" is supported for Pro-UGATIT.
 - `--resume`: The path to the pre-trained model weights. Default is "weights/anime/train_latest.pt".
 - `--input`: The directory containing the input images for translation. Default is "test_inputs".
 - `--saved-dir`: The directory to save the translated output images. Default is "test_outputs".
