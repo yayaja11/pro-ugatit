@@ -18,3 +18,24 @@ You can clone the repository and install the necessary dependencies using the fo
 git clone https://github.com/sam3u7858/pro-ugatit.git
 cd Pro-UGATIT
 pip install -r requirements.txt
+
+
+### Training Pro-UGATIT
+To train the Pro-UGATIT model with your preferred settings, use the following command:
+
+```bash
+CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7" python train/train_ugatit.py --anime False --dataset getreal512og --report_image_freq 80 --direction BtoA --worker 32 --img_size 512
+```
+
+Explanation of the command-line options:
+
+- `CUDA_VISIBLE_DEVICES`: Specify the GPU devices to use during training (e.g., "0,1,2,3,4,5,6,7" for multiple GPUs).
+- `--anime False`: Set this flag to `False` to indicate that the dataset is not anime-related.
+- `--dataset getreal512og`: Choose the dataset named `getreal512og` for training Pro-UGATIT.
+- `--report_image_freq 80`: Determine the frequency (every 80 steps) at which intermediate images will be saved for monitoring the training progress.
+- `--direction BtoA`: Define the translation direction, where BtoA means translating from domain B to domain A.
+- `--worker 32`: Set the number of workers for data loading during training to 32.
+- `--img_size 512`: Set the input image size for training to 512x512 pixels.
+
+Make sure to have the required dependencies installed and access to the training dataset before executing the command.
+
