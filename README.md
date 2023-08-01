@@ -78,13 +78,12 @@ This document provides information about the data sources used to train Pro-UGAT
 
 ## 1. FFHQ Dataset
 
-![FFHQ Dataset](https://github.com/NVlabs/ffhq-dataset)
+(https://github.com/NVlabs/ffhq-dataset)
 
 The FFHQ (Flickr-Faces-HQ) dataset is a high-quality dataset of human faces collected from Flickr. It contains over 70,000 high-resolution images of human faces with a resolution of 1024x1024 pixels. The images cover a diverse range of identities, ages, and facial expressions, making it an ideal dataset for training models like Pro-UGATIT.
 
 ## 2. Danbooru2021
-
-![Danbooru2021](https://gwern.net/danbooru2021)
+(https://gwern.net/danbooru2021)
 
 Danbooru2021 is an image dataset collected from the Danbooru imageboard, which contains a large collection of anime and manga artwork. The dataset includes a wide variety of anime-style illustrations and character designs. It is used in conjunction with the FFHQ dataset to create a hybrid dataset for anime-to-real face image translation.
 
