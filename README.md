@@ -72,9 +72,35 @@ python script_name.py --type MODEL_TYPE --resume WEIGHTS_PATH --input INPUT_DIR 
 - Use the `--align` flag to enable face alignment (currently unused).
 - Use the `--anime` flag to indicate whether the dataset is related to anime (default is True).
 
+# Data Sources for Pro-UGATIT
+
+This document provides information about the data sources used to train Pro-UGATIT, a progressive unsupervised generative attentional network with adaptive layer instance normalization for image-to-image translation.
+
+## 1. FFHQ Dataset
+
+![FFHQ Dataset](https://github.com/NVlabs/ffhq-dataset)
+
+The FFHQ (Flickr-Faces-HQ) dataset is a high-quality dataset of human faces collected from Flickr. It contains over 70,000 high-resolution images of human faces with a resolution of 1024x1024 pixels. The images cover a diverse range of identities, ages, and facial expressions, making it an ideal dataset for training models like Pro-UGATIT.
+
+## 2. Danbooru2021
+
+![Danbooru2021](https://gwern.net/danbooru2021)
+
+Danbooru2021 is an image dataset collected from the Danbooru imageboard, which contains a large collection of anime and manga artwork. The dataset includes a wide variety of anime-style illustrations and character designs. It is used in conjunction with the FFHQ dataset to create a hybrid dataset for anime-to-real face image translation.
+
+## 3. Anime2Coser Dataset
+
+The Anime2Coser dataset is created by combining data from the FFHQ dataset and Danbooru2021. The following steps are taken to construct this dataset:
+
+1. Real Face Data: Crop the high-resolution human face images from the FFHQ dataset to a resolution of 1024x1024 pixels. These images represent the "real" face domain.
+
+2. Anime Face Data: Select not-monotone images from the Danbooru2021 dataset, which includes a diverse range of anime-style illustrations. Crop the face regions from these anime images to a resolution of 1024x1024 pixels.
+
+By combining the real face data and anime face data, the Anime2Coser dataset is created to train Pro-UGATIT for image-to-image translation between anime-style faces and real human faces.
+
 ## Note
 
-- The script processes each image in the input directory, generates translated versions using Pro-UGATIT in both directions (A to B and B to A), and saves the output images as a grid in the specified output directory.
-- The script supports multi-GPU inference. If multiple GPUs are available, specify them using the `CUDA_VISIBLE_DEVICES` environment variable before running the script.
-- The provided code contains several utility functions, including `preprocessing()` and `read_img_path()`, which are used to prepare images for input to the model. These functions handle image loading, resizing, normalization, and conversion to PyTorch tensors.
+Pro-UGATIT leverages the diversity and high quality of the FFHQ dataset for real face images and the artistic and anime-style content from Danbooru2021 to achieve high-quality and realistic image-to-image translations.
+
+
 
