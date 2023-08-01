@@ -14,6 +14,8 @@ The implementation encompasses various progressive techniques to achieve high-qu
 ### Installation
 You can clone the repository and install the necessary dependencies using the following commands:
 
+
+
 ```bash
 git clone https://github.com/sam3u7858/pro-ugatit.git
 cd Pro-UGATIT
@@ -21,6 +23,7 @@ pip install -r requirements.txt
 
 
 ### Training Pro-UGATIT
+
 To train the Pro-UGATIT model with your preferred settings, use the following command:
 
 ```bash
