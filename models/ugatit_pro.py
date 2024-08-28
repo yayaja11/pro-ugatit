@@ -9,6 +9,8 @@ except:
 import functools
 from torch.nn.utils import spectral_norm
 
+import torch.autograd.profiler as profiler
+
 from math import sqrt
 
 import torch.nn.functional as nnf
@@ -414,7 +416,6 @@ class Generator(nn.Module):
         return x, x_class
 
     def forward(self, img, step=0,alpha=0):
-        
         e = self.fromRGBs[step](img)
 
         for i in range(step-1, -1, -1):
@@ -422,11 +423,12 @@ class Generator(nn.Module):
   
         e = self.encoder(e)
         x, x_class = self.cam(e)
+        del e
+        torch.cuda.empty_cache()
         b, c, h, w = x.shape
         gamma, beta = self.mlp(self.gap(x).view(b, c))  # predict beta, gamma of  adain
-
-        og = gamma
-        ob = beta
+        # gamma.detach()
+        # beta.detach()
 
         gamma = gamma.view(b, c, 1, 1)
         beta = beta.view(b, c, 1, 1)
@@ -792,6 +794,7 @@ class UGATIT(object):
             self.D_B = Discriminator(args.inc, args.ndf, args.d_layers)
         self.training = args.training
         self.size = args.load_size
+        self.args = args
 
         #self.blurModule = GaussianSmoothing(3, 9, 24)
         self.L1Loss = nn.L1Loss()
@@ -801,14 +804,28 @@ class UGATIT(object):
         realA, realB = inp['A'], inp['B']
         if torch.cuda.is_available() and self.args.cuda == True:
             realA, realB = realA.cuda(), realB.cuda()
+        del inp
+        realA = realA.detach()
+        realB = realB.detach()
+        torch.cuda.empty_cache()
         fakeB, cam_ab = self.G_A(realA,step=step)
+        fakeB = fakeB.detach()
+        torch.cuda.empty_cache()
+        
         fakeA, cam_ba = self.G_B(realB,step=step)
+        fakeA = fakeA.detach()
+        torch.cuda.empty_cache()
 
         #fakeAIn = nnf.interpolate(fakeA, size=self.size, mode='bilinear',align_corners=False)
         #fakeBIn = nnf.interpolate(fakeB, size=self.size, mode='bilinear',align_corners=False)
 
         recA, _ = self.G_B(fakeB,step=step)
+        recA = recA.detach()
+        torch.cuda.empty_cache()
+        
         recB, _ = self.G_A(fakeA,step=step)
+        recB = recB.detach()
+        torch.cuda.empty_cache()
 
         return realA, realB, fakeA, fakeB, recA, recB, cam_ab, cam_ba
 
@@ -834,12 +851,12 @@ class UGATIT(object):
 
     def state_dict(self):
         params = {
-            'G_A': self.G_A.module.state_dict(), # dist training
-            'G_B': self.G_B.module.state_dict(),
+            'G_A': self.G_A.state_dict(), # dist training
+            'G_B': self.G_B.state_dict(),
         }
         if self.training:
-            params['D_A'] = self.D_A.module.state_dict(),
-            params['D_B'] = self.D_B.module.state_dict()
+            params['D_A'] = self.D_A.state_dict(),
+            params['D_B'] = self.D_B.state_dict()
         return params
 
     def load_state_dict(self, weight_loc):
@@ -847,7 +864,7 @@ class UGATIT(object):
         self.G_A.load_state_dict(weight_set['G_A'])
         self.G_B.load_state_dict(weight_set['G_B'])
         if self.training:
-            self.D_A.load_state_dict(weight_set['D_A'])
+            self.D_A.load_state_dict(weight_set['D_A'][0])
             self.D_B.load_state_dict(weight_set['D_B'])
 
 

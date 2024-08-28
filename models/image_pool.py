@@ -33,7 +33,8 @@ class ImagePool():
         and insert the current images to the buffer.
         """
         if self.pool_size == 0:  # if the buffer size is 0, do nothing
-            return images
+            image = torch.unsqueeze(images.data, 0)
+            return torch.cat([images], 0)
         return_images = []
         for image in images:
             image = torch.unsqueeze(image.data, 0)
@@ -48,6 +49,7 @@ class ImagePool():
                     tmp = self.images[random_id].clone()
                     self.images[random_id] = image
                     return_images.append(tmp)
+                    del tmp
                 else:       # by another 50% chance, the buffer will return the current image
                     return_images.append(image)
         return_images = torch.cat(return_images, 0)   # collect all the images and return

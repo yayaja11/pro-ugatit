@@ -4,32 +4,21 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.ugatit_pro import UGATIT
 from configs.cfgs_ugatit import cfgs
 import torch
-import torch.distributed as dist
 import torch.multiprocessing as mp
 from utils.unpair_dataset import UnpairDataset
 import itertools
-from utils.utils import AvgMeter, init_path, get_scheduler
-
+from utils.utils import get_scheduler
 import os
 from tqdm import tqdm
-from torchvision.utils import save_image,make_grid
 from torch.utils.data import DataLoader
 from models.image_pool import ImagePool
 from models.loss import GANLoss, CAMLoss
 import numpy as np
-
-import argparse
 from main_utils import *
-from PIL import Image, ImageFont, ImageDraw  
-
-
+from torch.utils.data import DataLoader, RandomSampler
 
 
 class Train:
-    
-        
-        
-
     def __init__(self, model, loader, sample, args):
         self.model = model
         self.loader = loader
@@ -47,13 +36,9 @@ class Train:
             pass
 
         self.init()
-        if len(args.resume) != 0:  # resume
-            print('start load weight for resuming training.')
-            self.model.load_state_dict(args.resume)
-
-        
-        
-
+        #if len(args.resume) != 0:  # resume
+        print('start load weight for resuming training.')
+        self.model.load_state_dict("./results/preview/model/train_20.pt")
 
     def init(self):
         opt = self.args
@@ -133,27 +118,26 @@ class Train:
     def update_D(self, inp):
         real_A, real_B, fake_A, fake_B, rec_A, rec_B, _, _ = inp
         fake_B = self.fake_B_pool.query(fake_B)
-        loss_fake, loss_real, loss_fake_cam, loss_real_cam \
-            = self.update_D_basic(self.model.D_A, real_B, fake_B)
+        loss_fake, loss_real, loss_fake_cam, loss_real_cam = self.update_D_basic(self.model.D_A, real_B, fake_B)
         loss_D_A = loss_fake + loss_real + loss_fake_cam + loss_real_cam
         loss_D_A.backward()
 
         fake_A = self.fake_A_pool.query(fake_A)
-        loss_fake, loss_real, loss_fake_cam, loss_real_cam \
-            = self.update_D_basic(self.model.D_B, real_A, fake_A)
+        loss_fake, loss_real, loss_fake_cam, loss_real_cam = self.update_D_basic(self.model.D_B, real_A, fake_A)
         loss_D_B = loss_fake + loss_real + loss_fake_cam + loss_real_cam
         loss_D_B.backward()
         return loss_D_A, loss_D_B
-
-    
                 
 
     def train_on_step(self, inp):
         inp = self.model(inp)
-        self.realA = inp[0]  # b,c,h,w;  for tensorboard
-        self.realB = inp[1]
-        self.fakeA = inp[2]
-        self.fakeB = inp[3]
+
+        
+        # self.realA = inp[0]  # b,c,h,w;  for tensorboard
+        # self.realB = inp[1]
+        # self.fakeA = inp[2]
+        # self.fakeB = inp[3]
+
         # 先更新G
         self.set_requires_grad([self.model.D_A, self.model.D_B], False)
         self.optim_G.zero_grad()
@@ -164,75 +148,54 @@ class Train:
         self.optim_D.zero_grad()
         loss_D_A, loss_D_B = self.update_D(inp)
         self.optim_D.step()
-
+        del inp
+        torch.cuda.empty_cache()
+        
         return loss_G_A, loss_G_B, loss_cycle_A, loss_cycle_B, \
-               loss_D_A, loss_D_B, loss_cam_A, loss_cam_B
+            loss_D_A, loss_D_B, loss_cam_A, loss_cam_B
 
     def train_on_epoch(self, epoch):
-         
-            loss_meters = []
-            loss_names = ['G_A', 'G_B', 'Cyc_A', 'Cyc_B', 'D_A', 'D_B', 'CAM_A', 'CAM_B']
-            for _ in range(len(loss_names)):
-                loss_meters.append(AvgMeter())
-            if self.rank == 0:
-                progress_bar = tqdm(self.loader, desc='Epoch train')
-            else:
-                progress_bar = self.loader
-            for iter_idx, sample in enumerate(progress_bar):
+        print('initial emety cache',torch.cuda.memory_reserved())
+        torch.cuda.empty_cache()
+        if self.rank == 0:
+            progress_bar = tqdm(self.loader, desc='Epoch train')
+        else:
+            progress_bar = self.loader
+        for iter_idx, sample in enumerate(progress_bar):
+            loss = self.train_on_step(sample) # return loss
+            cur_lr = self.optim_G.param_groups[0]['lr']
+            step = iter_idx + 1 +  epoch * self.each_epoch_iters
+
+            nums_gpus = 1    
+            
+            for displayFactor in range(0,nums_gpus):
+                str_content = f'SSR:{step*nums_gpus+displayFactor}/{self.each_epoch_iters*nums_gpus} ? epoch: {epoch:d}; lr:{cur_lr:.6f} ;'
                 
-                losses_set = self.train_on_step(sample)
+                progress_bar.set_postfix(
+                        logger=str_content)
+            torch.cuda.empty_cache()
+
+            # if (step % self.args.report_image_freq) == 0:  # tensorboard
+            #     realA = make_grid(self.realA, padding=2, normalize=True, value_range=(-1, 1))
+            #     realB = make_grid(self.realB, padding=2, normalize=True, value_range=(-1, 1))
+            #     fakeA = make_grid(self.fakeA, padding=2, normalize=True, value_range=(-1, 1))
+            #     fakeB = make_grid(self.fakeB, padding=2, normalize=True, value_range=(-1, 1))
+
+            #     image_grid = torch.cat((realA, fakeB, realB, fakeA), 1)
                 
-                for loss, meter in zip(losses_set, loss_meters):
-                    dist.all_reduce(loss)
-                    loss = loss / self.args.gpus_num
-                    meter.update(loss)
-                cur_lr = self.optim_G.param_groups[0]['lr']
-                step = iter_idx + 1 +  epoch * self.each_epoch_iters
+            #     save_image(image_grid, os.path.join("results",self.args.dataset,"img",f"report_{step}.png"), normalize=False)
 
-                nums_gpus = self.args.gpus_num 
-                
-                   
-                
-                
-                if self.rank == 0:
-                    for displayFactor in range(0,nums_gpus):
-                        str_content = f'SSR:{step*nums_gpus+displayFactor}/{self.each_epoch_iters*nums_gpus} ? epoch: {epoch:d}; lr:{cur_lr:.6f} ;'
-                        
-                        progress_bar.set_postfix(
-                                logger=str_content)
-
-                    if (step % self.args.report_image_freq) == 0:  # tensorboard
-                        realA = make_grid(self.realA, padding=2, normalize=True, range=(-1, 1))
-                        realB = make_grid(self.realB, padding=2, normalize=True, range=(-1, 1))
-                        fakeA = make_grid(self.fakeA, padding=2, normalize=True, range=(-1, 1))
-                        fakeB = make_grid(self.fakeB, padding=2, normalize=True, range=(-1, 1))
-
-                        reportImage = image_grid = torch.cat((realA, fakeB, realB, fakeA), 1)
-                        
-                        save_image(image_grid, os.path.join("results",self.args.dataset,"img","report.png"), normalize=False)
-                    
-                        
-                        try:
-                            pass
-                           
-                        except Exception as e:
-                            print(f'{e} on 215')
-
-            if self.rank == 0:
-                progress_bar.close()
-
-
+        if self.rank == 0:
+            progress_bar.close()
 
     def train(self):
             
             args = self.args
 
-
             if args.start_epoch != 0:  # if resume, changing lr.
                 for _ in range(args.start_epoch):
                     self.update_learning_rate()
             for epoch in range(args.start_epoch, args.total_epoch):
-                self.sample.set_epoch(epoch)  # shuffle
                 self.train_on_epoch(epoch)
 
 
@@ -245,7 +208,7 @@ class Train:
                         torch.save(self.model.state_dict(), os.path.join('results', self.args.dataset,'model',f'train_{epoch}.pt'))
                     print('finish {}-th epoch.'.format(epoch))
                     if epoch %1==0:
-                         torch.save(self.model.state_dict(), os.path.join('results', self.args.dataset,'model',f'train_latest.pt'))
+                         torch.save(self.model.state_dict(), os.path.join('results', self.args.dataset,'model',f'train_{epoch}.pt'))
      
         
          
@@ -274,39 +237,48 @@ class Train:
                     param.requires_grad = requires_grad
 
 def main_worker(rank, args):
-    print(rank)
     args.rank = rank
     # init model and dataloader
-    dist.init_process_group(backend='nccl', init_method=args.dist_url, world_size=args.gpus_num,
-                            rank=args.rank)
+    # dist.init_process_group(backend='nccl', init_method=args.dist_url, world_size=1,
+    #                         rank=args.rank)
     torch.cuda.set_device(rank)
     
     model = UGATIT(args)
+    # import pdb;pdb.set_trace()
     model.train()
     model.cuda()
+
     # model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[rank])
-    model.G_A = torch.nn.parallel.DistributedDataParallel(model.G_A, device_ids=[rank])
-    model.G_B = torch.nn.parallel.DistributedDataParallel(model.G_B, device_ids=[rank])
-    model.D_A = torch.nn.parallel.DistributedDataParallel(model.D_A, device_ids=[rank])
-    model.D_B = torch.nn.parallel.DistributedDataParallel(model.D_B, device_ids=[rank])
+    model.G_A = model.G_A.to("cuda")  # 불필요하면 지우기 후보 1
+    model.G_B = model.G_B.to("cuda")
+    model.D_A = model.D_A.to("cuda")
+    model.D_B = model.D_B.to("cuda")
+    
+    # model.G_A = torch.nn.parallel.DistributedDataParallel(model.G_A, device_ids=[rank], find_unused_parameters=True)
+    # model.G_B = torch.nn.parallel.DistributedDataParallel(model.G_B, device_ids=[rank], find_unused_parameters=True )
+    # model.D_A = torch.nn.parallel.DistributedDataParallel(model.D_A, device_ids=[rank], find_unused_parameters=True)
+    # model.D_B = torch.nn.parallel.DistributedDataParallel(model.D_B, device_ids=[rank], find_unused_parameters=True)
 
     dataset = UnpairDataset(args)
-    sample = torch.utils.data.distributed.DistributedSampler(dataset)
+    # sample = torch.utils.data.distributed.DistributedSampler(dataset)
+    sample = RandomSampler(dataset)
     train_loader = DataLoader(dataset, args.batchsize, num_workers=args.worker, sampler=sample)
     trainer = Train(model, train_loader, sample, args)
     trainer.train()
 
 if __name__ == '__main__':
     args = cfgs
-    print(args)
     commandArgs = handleParser()
     trainAPath,trainBPath = handleDatasetPath(commandArgs.dataset)
     
 
-    args = argFixer(args,commandArgs,trainAPath,trainBPath)
+    # args = argFixer(commandArgs,trainAPath,trainBPath)
     print(args)
     
     port_id = 10000 + np.random.randint(0, 5000)
     args.dist_url = 'tcp://127.0.0.1:' + str(port_id)
     args.gpus_num = torch.cuda.device_count()
-    mp.spawn(main_worker, nprocs=args.gpus_num, args=(args,))
+    mp.set_start_method('spawn', force=True)  #
+    # mp.spawn(main_worker, nprocs=args.gpus_num, args=(args,))
+    main_worker(0, args=args)
+    
